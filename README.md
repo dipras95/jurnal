@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Jurnal Trading Pribadi
 
-## Getting Started
+Stack: Next.js + TypeScript + Tailwind + shadcn/ui + Prisma + SQLite.
 
-First, run the development server:
+## Fitur
+- Login sederhana (single user)
+- Dashboard KPI lengkap
+- Journal table: search, filter, sort, pagination
+- CRUD trade manual
+- Trade detail modal
+- Import data awal dari Excel (.xlsx/.xls)
+- Analytics (monthly PnL + status breakdown)
 
+## Format kolom Excel
+Harus sesuai header:
+Date, Pair, Position, Strategy, Timeframe, Leverage, Entry, SL, TP, Exit, Link Before, Link After, Notes, Risk $, SL Dist %, Pos Size $, R:R Plan, Margin $, Status, PnL $, R:R Actual, Balance, Drawdown %
+
+## Local Setup
 ```bash
+npm install
+npx prisma generate
+# Jika engine Prisma bermasalah di mesin lokal, langsung lanjut dev mode.
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Default login dari `.env`:
+- username: `admin`
+- password: `admin123`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Prisma + SQLite
+`.env`:
+```env
+DATABASE_URL="file:./dev.db"
+JWT_SECRET="change-this-super-secret"
+APP_USERNAME="admin"
+APP_PASSWORD="admin123"
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Seed user default:
+```bash
+npm run db:seed
+```
 
-## Learn More
+## Deploy Ubuntu VPS (PM2 + Nginx)
 
-To learn more about Next.js, take a look at the following resources:
+### 1. Install dependency server
+```bash
+sudo apt update
+sudo apt install -y nginx
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+sudo npm i -g pm2
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 2. Deploy app
+```bash
+git clone <repo> jurnaltrade
+cd jurnaltrade
+npm ci
+cp .env.example .env  # atau buat .env manual
+npx prisma generate
+# Jika migrate tersedia:
+# npx prisma migrate deploy
+# Jika tidak pakai migration file, pakai:
+# npx prisma db push
+npm run build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 3. Jalankan dengan PM2
+```bash
+pm2 start npm --name jurnaltrade -- start
+pm2 save
+pm2 startup
+```
 
-## Deploy on Vercel
+### 4. Nginx reverse proxy
+`/etc/nginx/sites-available/jurnaltrade`
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Enable:
+```bash
+sudo ln -s /etc/nginx/sites-available/jurnaltrade /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+## Catatan
+- App ini memang single-user, tanpa Binance API, tanpa realtime.
+- UI didesain dark, clean, dan desktop-focused.
