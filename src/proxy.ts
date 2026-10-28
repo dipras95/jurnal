@@ -4,7 +4,7 @@ import { verifySession } from "@/lib/auth";
 
 const PUBLIC_PATHS = ["/login", "/api/auth/login", "/_next", "/favicon.ico"];
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
@@ -17,5 +17,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api/import/excel).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

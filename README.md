@@ -1,80 +1,62 @@
-# Jurnal Trading Pribadi
+# Trading Journal
 
-Stack: Next.js + TypeScript + Tailwind + shadcn/ui + Prisma + SQLite.
+A single-user trading journal: log trades, import history from Excel, and track KPIs and monthly PnL.
 
-## Fitur
-- Login sederhana (single user)
-- Dashboard KPI lengkap
-- Journal table: search, filter, sort, pagination
-- CRUD trade manual
-- Trade detail modal
-- Import data awal dari Excel (.xlsx/.xls)
-- Analytics (monthly PnL + status breakdown)
+**Stack:** Next.js 16 · TypeScript · Tailwind CSS · shadcn/ui · Prisma · SQLite
 
-## Format kolom Excel
-Harus sesuai header:
-Date, Pair, Position, Strategy, Timeframe, Leverage, Entry, SL, TP, Exit, Link Before, Link After, Notes, Risk $, SL Dist %, Pos Size $, R:R Plan, Margin $, Status, PnL $, R:R Actual, Balance, Drawdown %
+## Features
 
-## Local Setup
+- Password login (single user) with an HTTP-only JWT session cookie
+- Dashboard with trading KPIs
+- Journal table with search, filters, sorting, and pagination
+- Create, edit, and delete trades, with a detail view
+- Excel import (`.xlsx` / `.xls`, max 5 MB) for existing trade history
+- Analytics: monthly PnL and status breakdown
+
+## Excel import format
+
+The first sheet must use these headers:
+
+```
+Date, Pair, Position, Strategy, Timeframe, Leverage, Entry, SL, TP, Exit,
+Link Before, Link After, Notes, Risk $, SL Dist %, Pos Size $, R:R Plan,
+Margin $, Status, PnL $, R:R Actual, Balance, Drawdown %
+```
+
+## Local setup
+
 ```bash
 npm install
+cp .env.example .env      # then edit the values
 npx prisma generate
-# Jika engine Prisma bermasalah di mesin lokal, langsung lanjut dev mode.
+npx prisma db push
+npm run db:seed           # creates the login user from APP_USERNAME / APP_PASSWORD
 npm run dev
 ```
 
-Default login dari `.env`:
-- username: `admin`
-- password: `admin123`
+## Security notes
 
-## Prisma + SQLite
-`.env`:
-```env
-DATABASE_URL="file:./dev.db"
-JWT_SECRET="change-this-super-secret"
-APP_USERNAME="admin"
-APP_PASSWORD="admin123"
-```
+- Every page and API route, including the Excel import, requires a valid session. Auth runs in `src/proxy.ts` (Next.js 16 proxy, Node runtime) and again inside the import route.
+- `JWT_SECRET` is required in production. The app refuses to sign or accept tokens without it rather than falling back to a default.
+- Change `APP_PASSWORD` before seeding anything you deploy.
 
-Seed user default:
+## Deploying to an Ubuntu VPS (PM2 + Nginx)
+
 ```bash
-npm run db:seed
-```
-
-## Deploy Ubuntu VPS (PM2 + Nginx)
-
-### 1. Install dependency server
-```bash
-sudo apt update
-sudo apt install -y nginx
+sudo apt update && sudo apt install -y nginx
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-sudo npm i -g pm2
-```
+sudo apt install -y nodejs && sudo npm i -g pm2
 
-### 2. Deploy app
-```bash
-git clone <repo> jurnaltrade
-cd jurnaltrade
+git clone <repo> jurnal && cd jurnal
 npm ci
-cp .env.example .env  # atau buat .env manual
-npx prisma generate
-# Jika migrate tersedia:
-# npx prisma migrate deploy
-# Jika tidak pakai migration file, pakai:
-# npx prisma db push
+cp .env.example .env      # set a strong JWT_SECRET and APP_PASSWORD
+npx prisma generate && npx prisma db push && npm run db:seed
 npm run build
+pm2 start npm --name jurnal -- start && pm2 save && pm2 startup
 ```
 
-### 3. Jalankan dengan PM2
-```bash
-pm2 start npm --name jurnaltrade -- start
-pm2 save
-pm2 startup
-```
+Nginx reverse proxy (`/etc/nginx/sites-available/jurnal`):
 
-### 4. Nginx reverse proxy
-`/etc/nginx/sites-available/jurnaltrade`
 ```nginx
 server {
     listen 80;
@@ -91,13 +73,13 @@ server {
 }
 ```
 
-Enable:
 ```bash
-sudo ln -s /etc/nginx/sites-available/jurnaltrade /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
+sudo ln -s /etc/nginx/sites-available/jurnal /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl restart nginx
 ```
 
-## Catatan
-- App ini memang single-user, tanpa Binance API, tanpa realtime.
-- UI didesain dark, clean, dan desktop-focused.
+Add HTTPS with Certbot before using it over the internet, since the session cookie is marked `Secure` in production.
+
+## Scope
+
+Single-user by design: no exchange API integration and no real-time data. The UI is dark and desktop-focused.

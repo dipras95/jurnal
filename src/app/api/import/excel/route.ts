@@ -2,11 +2,17 @@ import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
 import { toNum } from "@/lib/analytics";
+import { getSession } from "@/lib/auth";
+
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 export async function POST(req: Request) {
+  if (!(await getSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const form = await req.formData();
   const file = form.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
+  if (file.size > MAX_FILE_BYTES) return NextResponse.json({ error: "File too large (max 5 MB)" }, { status: 413 });
 
   const bytes = await file.arrayBuffer();
   const workbook = XLSX.read(bytes, { type: "array" });

@@ -2,17 +2,24 @@ import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 
 const AUTH_COOKIE = "jt_auth";
-const SECRET = process.env.JWT_SECRET ?? "dev-secret-change-me";
+// In production a missing JWT_SECRET must fail closed, never fall back to a
+// value that is public in this repo.
+function secret(): string {
+  const value = process.env.JWT_SECRET;
+  if (value) return value;
+  if (process.env.NODE_ENV === "production") throw new Error("JWT_SECRET is not set");
+  return "dev-only-secret";
+}
 
 export type SessionPayload = { username: string };
 
 export function signSession(payload: SessionPayload): string {
-  return jwt.sign(payload, SECRET, { expiresIn: "30d" });
+  return jwt.sign(payload, secret(), { expiresIn: "30d" });
 }
 
 export function verifySession(token: string): SessionPayload | null {
   try {
-    return jwt.verify(token, SECRET) as SessionPayload;
+    return jwt.verify(token, secret()) as SessionPayload;
   } catch {
     return null;
   }
